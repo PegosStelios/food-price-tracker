@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -80,13 +81,14 @@ for category in categories:
 # Make sure each subcategory is saved inside its parent key folder.
 
 # Create a folder for categories
+
 # os.mkdir("sklavenitis")
-#
+
 # # Loop through each category and create a folder for it
 # for category in categories_dict:
-#     category_folder = os.path.join("categories", category)
+#     category_folder = os.path.join("sklavenitis", category)
 #     os.mkdir(category_folder)
-#
+
 #     # Loop through each subcategory and save the HTML file in the category folder
 #     for subcategory in categories_dict[category]["subcategories"]:
 #         filename = subcategory["name"] + ".html"
@@ -108,14 +110,36 @@ products = soup.find("div", id="productList").find_all("div", class_="product")
 
 print(len(products))
 
-browser = webdriver.Chrome( executable_path=r"chromedriver.exe")
-browser.get('https://www.sklavenitis.gr/trofes-eidi-gia-katoikidia/trofes-eidi-gia-skyloys/')
+driver = webdriver.Chrome( executable_path=r"chromedriver.exe")
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko")
+#extra options
+chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+chrome_options.add_argument('--disable-blink-features=AutomationControlled')
 
-products = browser.find_elements_by_class_name("product")
+driver.get('https://www.sklavenitis.gr/trofes-eidi-gia-katoikidia/trofes-eidi-gia-skyloys/')
 
-for product in products:
-    name = product.find_element_by_xpath('//*[@id="productList"]/div/section/div[1]/div[2]/article/h4/a')
+SCROLL_PAUSE_TIME = 5
+time.sleep(SCROLL_PAUSE_TIME)
 
+# Get scroll height
+last_height = driver.execute_script("return document.body.scrollHeight")
 
+for x in range(0, 10):
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    search = driver.find_elements(By.CLASS_NAME, "product")
+    time.sleep(SCROLL_PAUSE_TIME)
+    new_height = driver.execute_script("return document.body.scrollHeight")
+    if new_height == last_height:
+        break
+    last_height = new_height
+driver.close()
 
-browser.quit()
+print(len(search))
+
+print(categories_dict["Τροφές & Είδη για Κατοικίδια"])
+
+driver.quit()
