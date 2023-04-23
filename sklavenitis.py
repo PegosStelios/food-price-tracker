@@ -152,6 +152,15 @@ for category in categories_dict:
 # driver.close()
 
 def extract_max_product(soup):
+    """
+    Extracts the maximum product number from a BeautifulSoup object representing an HTML page.
+
+    Parameters:
+    soup (BeautifulSoup): A BeautifulSoup object representing an HTML page.
+
+    Returns:
+    max_product (int or None): The maximum product number on the page, or None if it could not be found.
+    """
     # Find the span element with class "current-page" and extract its text
     current_page_span = soup.find('span', {'class': 'current-page'})
     current_page_text = current_page_span.text.strip()
@@ -163,9 +172,17 @@ def extract_max_product(soup):
     return max_product
 
 
-def process_html_file(file_path):
-    # This function should process the HTML file and return the relevant data as a dictionary
 
+def process_html_file(file_path):
+    """
+    Process an HTML file and return a dictionary with relevant data.
+
+    Args:
+        file_path (str): Path to the HTML file.
+
+    Returns:
+        dict: A dictionary with the max_product and under24 values.
+    """
     # Parse the HTML using BeautifulSoup
     doc = open(file_path, encoding="utf-8")
     soup = BeautifulSoup(doc, "html.parser")
@@ -188,8 +205,13 @@ def process_html_file(file_path):
     return {"max_product": max_product, "under24": under24}
 
 
-
 def process_directory(dir_path):
+    """
+    Recursively process a directory and its subdirectories.
+
+    Args:
+        dir_path (str): Path to the directory.
+    """
     for filename in os.listdir(dir_path):
         file_path = os.path.join(dir_path, filename)
         if os.path.isfile(file_path) and filename.endswith(".html"):
@@ -216,4 +238,3 @@ root_dir = "."
 process_directory(root_dir)
 
 print("Done!")
-
