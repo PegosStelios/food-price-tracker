@@ -2,6 +2,9 @@
 
 This is a web scraper written in Python that scrapes multiple grocery sites such as Sklavenitis to gather information about categories, subcategories, and their products. The scraper saves the responses in HTML files and puts them in a folder named `sklavenitis/responses`.
 
+** It's still a work in progress. **
+** It currently only scrapes the Sklavenitis site. **
+
 ## Installation
 
 1. Clone the repository
