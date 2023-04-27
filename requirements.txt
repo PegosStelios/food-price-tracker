@@ -4,3 +4,4 @@ requests
 transliterate
 unidecode
 tqdm
+playwright
