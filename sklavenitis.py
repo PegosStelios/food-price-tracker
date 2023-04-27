@@ -1,19 +1,22 @@
 import functions
 import os
-import json
 from bs4 import BeautifulSoup
 from transliterate import translit
 import requests
 import concurrent.futures
 from tqdm import tqdm
 from playwright.sync_api import sync_playwright
-
+import shutil
 
 BASE_URL = "https://www.sklavenitis.gr"
 KATIGORIES_URL = "https://www.sklavenitis.gr/katigories"
 FOLDER_NAME = "sklavenitis"
 
-# Since we are doing the shop sklavenitis.gr, we need to put everything in a folder called sklavenitis
+if __name__ == '__main__':
+    print("This is a module, not a script. Please run main.py instead.")
+    exit()
+
+# Since we are doing the shop sklavenitis.gr, we need to put everything in a folder called sklavenitis.
 if not os.path.exists(FOLDER_NAME):
     os.mkdir(FOLDER_NAME)
     print("Folder created")
@@ -22,11 +25,11 @@ else:
     os.chdir(FOLDER_NAME)
 print("Folder already exists, using existing folder...")
 
-# This file is essential for the scraper to work, it contains all the categories and subcategories of the shop
+# This file is essential for the scraper to work, it contains all the categories and subcategories of the shop.
 functions.getPage(KATIGORIES_URL, "sklavenitis-katigories.html", False, True)
 
-# Once the file is downloaded, we can start scraping the data
-# We need to find the categories and subcategories
+# Once the file is downloaded, we can start scraping the data.
+# We need to find the categories and subcategories.
 doc = open('sklavenitis-katigories.html', encoding="utf-8")
 soup = BeautifulSoup(doc, "html.parser")
 categories = soup.find_all("div", class_="categories_item")
@@ -37,9 +40,9 @@ categories_list = []
 
 for category in categories:
     # Use the url BASE_URL/eidi-artozacharoplasteioy/psomi-typopoiimeno/
-    # to get the subcategories and the total products
-    # the first part after the domain is the category name
-    # the second part is the subcategory name
+    # to get the subcategories and the total products.
+    # the first part after the domain is the category name.
+    # the second part is the subcategory name.
 
     category_name = category.find("h3", class_="categories_title").text.strip()
     category_name = translit(category_name, "el", 'en')
@@ -76,51 +79,68 @@ for category in categories:
 
     categories_list.append(categories_dict)
 
+# To be used later for when we send the requests.
 headers = {
     "DNT": "1",
     "Cookie": "to-be-determined",
 }
 
+
 def get_request(url, file_name, headers):
+    # Create a folder called responses and save the responses there.
+    folder_name = 'responses'
+    if os.path.exists(folder_name):
+        shutil.rmtree(folder_name)
+    os.makedirs(folder_name)
+    # Send the request and save the response,
     querystring = {
-        "$component":"Atcom.Sites.Yoda.Components.ProductList.Index",
-        "sortby":"ByPopularity",
-        "pg":"1",
-        "endless":"false"
+        "$component": "Atcom.Sites.Yoda.Components.ProductList.Index",
+        "sortby": "ByPopularity",
+        "pg": "1",
+        "endless": "false"
     }
     response = requests.get(url, headers=headers, params=querystring)
-    with open(os.path.join('responses', file_name), 'wb') as f:
+    with open(os.path.join(folder_name, file_name), 'wb') as f:
         f.write(response.content)
 
+
 def send_and_save_requests():
-    urls = [subcategory["downloadLink"] for category in categories_dict.values() for subcategory in category["subcategories"]]
+    # Send the requests and save the responses using the links from the categories_dict.
+    urls = [subcategory["downloadLink"] for category in categories_dict.values()
+            for subcategory in category["subcategories"]]
     file_names = [f"response{i}.html" for i in range(1, len(urls) + 1)]
 
+    # We use multithreading to speed up the process, we can use up to 3 threads at a time without getting flagged.
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(get_request, url, file_name, headers) for url, file_name in zip(urls, file_names)]
+        futures = [executor.submit(get_request, url, file_name, headers)
+                   for url, file_name in zip(urls, file_names)]
         with tqdm(total=len(futures)) as pbar:
             for future in concurrent.futures.as_completed(futures):
                 pbar.update(1)
 
+    # Check if all the responses have been saved.
     num_files = len(os.listdir('responses'))
     if num_files == len(urls):
-        print(f"All {num_files} responses have been successfully saved in the 'responses' folder.")
+        print(
+            f"All {num_files} responses have been successfully saved in the 'responses' folder.")
     else:
         print("Error: Number of files in 'responses' folder does not match the number of links.")
         exit()
 
+# We need to get the cookies from the website to be able to send requests.
 def get_cookie_playwright():
     with sync_playwright() as p:
+        # Launch the browser in headless mode and create a new page.
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
         page.goto("https://www.sklavenitis.gr/")
-        page.click("button.nvcookies__button.nvcookies__button--primary.consent-give")
-        print(context.cookies())
+        # Click the button to accept the cookies.
+        page.click(
+            "button.nvcookies__button.nvcookies__button--primary.consent-give")
+        # Get the correct cookies and add them to the headers.
         cookie_for_requests = ''
         for cookie in context.cookies():
             cookie_for_requests += cookie['name'] + '=' + cookie['value'] + ';'
-
-        browser.close()
-        print(f"Cookie for requests: {cookie_for_requests}")
         headers["Cookie"] = cookie_for_requests
+        browser.close()
