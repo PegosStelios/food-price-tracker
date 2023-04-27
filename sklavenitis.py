@@ -124,10 +124,3 @@ def get_cookie_playwright():
         browser.close()
         print(f"Cookie for requests: {cookie_for_requests}")
         headers["Cookie"] = cookie_for_requests
-
-if __name__ == '__main__':
-    get_cookie_playwright()
-    print(f"Cookie for requests 2 : {headers['Cookie']}")
-    send_and_save_requests()
-
-print("Done!")
