@@ -144,3 +144,8 @@ def get_cookie_playwright():
             cookie_for_requests += cookie['name'] + '=' + cookie['value'] + ';'
         headers["Cookie"] = cookie_for_requests
         browser.close()
+
+
+# TODO: Save the responses using a proper name. (category-subcategory.html)
+# TODO: Get the products from each subcategory.
+# TODO: Find a way to get the total products for each subcategory. (multiple of 24 based on the total products listed on the website)
