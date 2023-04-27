@@ -3,10 +3,11 @@ import os
 import json
 from bs4 import BeautifulSoup
 from transliterate import translit
-import time
-from pathlib import Path
-import re
 import requests
+import concurrent.futures
+from tqdm import tqdm
+from playwright.sync_api import sync_playwright
+
 
 BASE_URL = "https://www.sklavenitis.gr"
 KATIGORIES_URL = "https://www.sklavenitis.gr/katigories"
@@ -75,28 +76,12 @@ for category in categories:
 
     categories_list.append(categories_dict)
 
-# json dump
-with open("sklavenitis.json", "w", encoding="utf-8") as f:
-    json.dump(categories_dict, f, ensure_ascii=False, indent=4)
-
-# find the total amount of downloadLinks
-amount = 0
-for category in categories_dict:
-    for subcategory in categories_dict[category]["subcategories"]:
-        #print(subcategory["downloadLink"])
-        amount += 1
-print(f"Total amount of downloadLinks: {amount}")
-
-import os
-import threading
-import requests
-
 headers = {
     "DNT": "1",
-    "Cookie": "StoreSID=57fa2df7-c0be-432a-89bb-81c04a06b484; AKA_A2=A",
+    "Cookie": "to-be-determined",
 }
 
-def get_request(url, file_name):
+def get_request(url, file_name, headers):
     querystring = {
         "$component":"Atcom.Sites.Yoda.Components.ProductList.Index",
         "sortby":"ByPopularity",
@@ -104,40 +89,45 @@ def get_request(url, file_name):
         "endless":"false"
     }
     response = requests.get(url, headers=headers, params=querystring)
-    with open(file_name, 'wb') as f:
+    with open(os.path.join('responses', file_name), 'wb') as f:
         f.write(response.content)
 
-# Create the responses folder if it doesn't exist
-if not os.path.exists("responses"):
-    os.mkdir("responses")
+def send_and_save_requests():
+    urls = [subcategory["downloadLink"] for category in categories_dict.values() for subcategory in category["subcategories"]]
+    file_names = [f"response{i}.html" for i in range(1, len(urls) + 1)]
 
-# Delete the responses folder and its contents if it exists
-if os.path.exists("responses"):
-    for filename in os.listdir("responses"):
-        os.remove(os.path.join("responses", filename))
-    os.rmdir("responses")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(get_request, url, file_name, headers) for url, file_name in zip(urls, file_names)]
+        with tqdm(total=len(futures)) as pbar:
+            for future in concurrent.futures.as_completed(futures):
+                pbar.update(1)
 
-# Recreate the responses folder
-os.mkdir("responses")
+    num_files = len(os.listdir('responses'))
+    if num_files == len(urls):
+        print(f"All {num_files} responses have been successfully saved in the 'responses' folder.")
+    else:
+        print("Error: Number of files in 'responses' folder does not match the number of links.")
+        exit()
 
-# Loop over the links and download the responses
-threads = []
-for i, category in enumerate(categories_dict):
-    for j, subcategory in enumerate(categories_dict[category]["subcategories"]):
-        url = subcategory["downloadLink"]
-        file_name = f"responses/response{i+1}-{j+1}.html"
-        thread = threading.Thread(target=get_request, args=[url, file_name])
-        threads.append(thread)
-        thread.start()
+def get_cookie_playwright():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+        page.goto("https://www.sklavenitis.gr/")
+        page.click("button.nvcookies__button.nvcookies__button--primary.consent-give")
+        print(context.cookies())
+        cookie_for_requests = ''
+        for cookie in context.cookies():
+            cookie_for_requests += cookie['name'] + '=' + cookie['value'] + ';'
 
-# Wait for all threads to finish
-for thread in threads:
-    thread.join()
+        browser.close()
+        print(f"Cookie for requests: {cookie_for_requests}")
+        headers["Cookie"] = cookie_for_requests
 
-# Count the number of response files
-response_count = len([filename for filename in os.listdir("responses") if filename.endswith(".html")])
-
-# Print the number of response files
-print(f"Downloaded {response_count} responses.")
+if __name__ == '__main__':
+    get_cookie_playwright()
+    print(f"Cookie for requests 2 : {headers['Cookie']}")
+    send_and_save_requests()
 
 print("Done!")
