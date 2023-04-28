@@ -11,73 +11,74 @@ import shutil
 BASE_URL = "https://www.sklavenitis.gr"
 KATIGORIES_URL = "https://www.sklavenitis.gr/katigories"
 FOLDER_NAME = "sklavenitis"
+CATEGORIES_DICT = {}
+CATEGORIES_LIST = []
 
 if __name__ == '__main__':
     print("This is a module, not a script. Please run main.py instead.")
     exit()
 
 # Since we are doing the shop sklavenitis.gr, we need to put everything in a folder called sklavenitis.
-if not os.path.exists(FOLDER_NAME):
-    os.mkdir(FOLDER_NAME)
-    print("Folder created")
-    os.chdir(FOLDER_NAME)
-else:
-    os.chdir(FOLDER_NAME)
-print("Folder already exists, using existing folder...")
+def create_folder():
+    if not os.path.exists(FOLDER_NAME):
+        os.mkdir(FOLDER_NAME)
+        print("Folder created")
+        os.chdir(FOLDER_NAME)
+    else:
+        os.chdir(FOLDER_NAME)
+    print("Folder already exists, using existing folder...")
 
 # This file is essential for the scraper to work, it contains all the categories and subcategories of the shop.
-functions.getPage(KATIGORIES_URL, "sklavenitis-katigories.html", False, True)
+def create_categories():
+    functions.get_categories_page(KATIGORIES_URL, "sklavenitis-katigories.html")
 
-# Once the file is downloaded, we can start scraping the data.
-# We need to find the categories and subcategories.
-doc = open('sklavenitis-katigories.html', encoding="utf-8")
-soup = BeautifulSoup(doc, "html.parser")
-categories = soup.find_all("div", class_="categories_item")
+    # Once the file is downloaded, we can start scraping the data.
+    # We need to find the categories and subcategories.
+    doc = open('sklavenitis-katigories.html', encoding="utf-8")
+    soup = BeautifulSoup(doc, "html.parser")
+    categories = soup.find_all("div", class_="categories_item")
 
-# Loop through each category and print the category name, image and subcategories.
-categories_dict = {}
-categories_list = []
+    for category in categories:
+        # Use the url BASE_URL/eidi-artozacharoplasteioy/psomi-typopoiimeno/
+        # to get the subcategories and the total products.
+        # the first part after the domain is the category name.
+        # the second part is the subcategory name.
 
-for category in categories:
-    # Use the url BASE_URL/eidi-artozacharoplasteioy/psomi-typopoiimeno/
-    # to get the subcategories and the total products.
-    # the first part after the domain is the category name.
-    # the second part is the subcategory name.
+        category_name = category.find("h3", class_="categories_title").text.strip()
+        category_name = translit(category_name, "el", 'en')
+        category_name = functions.removeNonAlphaNumeric(
+            category_name, True, False, True, False)
 
-    category_name = category.find("h3", class_="categories_title").text.strip()
-    category_name = translit(category_name, "el", 'en')
-    category_name = functions.removeNonAlphaNumeric(
-        category_name, True, False, True, False)
+        category_image = category.find(
+            "img")["src"].strip().replace("\n", "").replace("\t", "")
+        subcategories = category.find("div", class_="categories_subs")
+        subcategories_list = []
 
-    category_image = category.find(
-        "img")["src"].strip().replace("\n", "").replace("\t", "")
-    subcategories = category.find("div", class_="categories_subs")
-    subcategories_list = []
+        for subcategory in subcategories.find_all("a"):
+            subcategory_name = subcategory.text.strip()
+            subcategory_name = translit(subcategory_name, "el", 'en')
+            subcategory_name = functions.removeNonAlphaNumeric(
+                subcategory_name, True, False, True, False)
+            subcategory_link = subcategory["href"].strip()
+            original_subcategory_link = subcategory_link
+            subcategory_link = functions.removeNonAlphaNumeric(
+                subcategory_link, True, True, False, True)
 
-    for subcategory in subcategories.find_all("a"):
-        subcategory_name = subcategory.text.strip()
-        subcategory_name = translit(subcategory_name, "el", 'en')
-        subcategory_name = functions.removeNonAlphaNumeric(
-            subcategory_name, True, False, True, False)
-        subcategory_link = subcategory["href"].strip()
-        original_subcategory_link = subcategory_link
-        subcategory_link = functions.removeNonAlphaNumeric(
-            subcategory_link, True, True, False, True)
+            subcategories_list.append({
+                "name": subcategory_name,
+                "link": subcategory_link,
+                "downloadLink": BASE_URL + original_subcategory_link,
+                "productsAmount": "Unknown"
+            })
 
-        subcategories_list.append({
-            "name": subcategory_name,
-            "link": subcategory_link,
-            "downloadLink": BASE_URL + original_subcategory_link,
-            "productsAmount": "Unknown"
-        })
+        CATEGORIES_DICT[category_name] = {
+            "image": category_image,
+            "subcategoryAmount": len(subcategories_list),
+            "subcategories": subcategories_list
+        }
 
-    categories_dict[category_name] = {
-        "image": category_image,
-        "subcategoryAmount": len(subcategories_list),
-        "subcategories": subcategories_list
-    }
+    CATEGORIES_LIST.extend(CATEGORIES_DICT.values())
 
-    categories_list.append(categories_dict)
 
 # To be used later for when we send the requests.
 headers = {
@@ -85,28 +86,25 @@ headers = {
     "Cookie": "to-be-determined",
 }
 
-
 def get_request(url, file_name, headers):
-    # Create a folder called responses and save the responses there.
-    folder_name = 'responses'
-    if os.path.exists(folder_name):
-        shutil.rmtree(folder_name)
-    os.makedirs(folder_name)
-    # Send the request and save the response,
     querystring = {
-        "$component": "Atcom.Sites.Yoda.Components.ProductList.Index",
-        "sortby": "ByPopularity",
-        "pg": "1",
-        "endless": "false"
+        "$component":"Atcom.Sites.Yoda.Components.ProductList.Index",
+        "sortby":"ByPopularity",
+        "pg":"1",
+        "endless":"false"
     }
     response = requests.get(url, headers=headers, params=querystring)
-    with open(os.path.join(folder_name, file_name), 'wb') as f:
-        f.write(response.content)
+    if response.status_code == 200:
+        with open(os.path.join('responses', file_name), 'wb') as f:
+            f.write(response.content)
+    else:
+        print(f"Error: {response.status_code} - Could not save response for {url}")
+        exit()
 
 
 def send_and_save_requests():
     # Send the requests and save the responses using the links from the categories_dict.
-    urls = [subcategory["downloadLink"] for category in categories_dict.values()
+    urls = [subcategory["downloadLink"] for category in CATEGORIES_DICT.values()
             for subcategory in category["subcategories"]]
     file_names = [f"response{i}.html" for i in range(1, len(urls) + 1)]
 
