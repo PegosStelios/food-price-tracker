@@ -6,7 +6,7 @@ import requests
 import concurrent.futures
 from tqdm import tqdm
 from playwright.sync_api import sync_playwright
-import shutil
+import re
 
 BASE_URL = "https://www.sklavenitis.gr"
 KATIGORIES_URL = "https://www.sklavenitis.gr/katigories"
@@ -80,11 +80,26 @@ def create_categories():
     CATEGORIES_LIST.extend(CATEGORIES_DICT.values())
 
 
+    import json
+    with open("sklavenitis.json", "w", encoding="utf-8") as f:
+        json.dump(CATEGORIES_DICT, f, ensure_ascii=False, indent=4)
+
+
 # To be used later for when we send the requests.
 headers = {
     "DNT": "1",
     "Cookie": "to-be-determined",
 }
+
+def get_category_and_subcategory(url):
+    # Extract the category and subcategory from the URL.
+    parts = url.split("/")
+    if len(parts) < 5:
+        raise ValueError("Invalid URL format.")
+    category = parts[3]
+    subcategory = parts[4]
+    return category, subcategory
+
 
 def get_request(url, file_name, headers):
     querystring = {
@@ -106,11 +121,16 @@ def send_and_save_requests():
     # Send the requests and save the responses using the links from the categories_dict.
     urls = [subcategory["downloadLink"] for category in CATEGORIES_DICT.values()
             for subcategory in category["subcategories"]]
-    file_names = [f"response{i}.html" for i in range(1, len(urls) + 1)]
+    print(urls)
+    file_names = [f"{get_category_and_subcategory(url)[0]}/{get_category_and_subcategory(url)[1]}.html" for url in urls]
+
+    # Create directories for each category if they do not exist already.
+    for category in CATEGORIES_DICT.keys():
+        os.makedirs(f"responses/{category}", exist_ok=True)
 
     # We use multithreading to speed up the process, we can use up to 3 threads at a time without getting flagged.
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(get_request, url, file_name, headers)
+        futures = [executor.submit(get_request, url, f"responses/{file_name}", headers)
                    for url, file_name in zip(urls, file_names)]
         with tqdm(total=len(futures)) as pbar:
             for future in concurrent.futures.as_completed(futures):
@@ -147,3 +167,4 @@ def get_cookie_playwright():
 # TODO: Save the responses using a proper name. (category-subcategory.html)
 # TODO: Get the products from each subcategory.
 # TODO: Find a way to get the total products for each subcategory. (multiple of 24 based on the total products listed on the website)
+# TODO: Fix responses not getting saved in the correct folder, now they wont save at all.
