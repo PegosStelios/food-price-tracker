@@ -3,101 +3,31 @@ import requests
 import re
 from unidecode import unidecode as ud
 
-
-def getPage(url, filename, auto, accept):
-    """
-    Downloads the HTML content of a webpage and saves it to a file.
-
-    Parameters:
-    url (str): The URL of the webpage to download.
-    filename (str): The name of the file to save the HTML content to.
-    auto (bool): If True, automatically downloads the file if it does not exist.
-    accept (bool): If True, prompts the user to download the file if it does not exist.
-
-    Returns:
-    None: The function does not return anything.
-
-    Raises:
-    HTTPError: If there is an error with the HTTP request.
-    """
-
-    # Check if filename and url are not None
-    if filename is None:
-        print("filename is None, exiting...")
-        exit()
-
-    if url is None:
-        print("File does not exist, exiting...")
-        exit()
-
-    # If auto mode is enabled, download the file without prompting the user
-    if auto and not accept and (auto or accept) is not None:
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            html = response.text
-
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write(html)
-        except requests.exceptions.HTTPError as e:
-            print("Http Error:", e)
-            exit()
-
-    # If the file already exists, prompt the user to overwrite it or use the existing file
-    elif os.path.exists(filename):
-        match input("File already exists, do you want to overwrite it? (y/n): "):
-            case "y":
-                try:
-                    try:
-                        os.remove(filename)
-                    except OSError as e:
-                        print("Error: %s - %s." % (e.filename, e.strerror))
-                        exit()
-
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    html = response.text
-
-                    with open(filename, "w", encoding="utf-8") as f:
-                        f.write(html)
-                except requests.exceptions.HTTPError as e:
-                    print("Http Error:", e)
-                    exit()
-            case "n":
-                print("Using existing file...")
-            case _:
-                print("Invalid choice, exiting...")
-                exit()
-
-    # If accept mode is enabled, prompt the user to download the file
-    elif accept and not auto and (auto or accept) is not None:
-        match input("File does not exist, download? (y/n): "):
-            case "y":
-                try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    html = response.text
-
-                    with open(filename, "w", encoding="utf-8") as f:
-                        f.write(html)
-                except requests.exceptions.HTTPError as e:
-                    print("Http Error:", e)
-                    exit()
-            case "n":
-                print("Using existing file...")
-            case _:
-                print("Invalid choice, exiting...")
-                exit()
-
-    # If none of the above conditions are true, something went wrong
-    else:
+def get_categories_page(url, filename):
+    try:
+        if os.path.exists(filename):
+            answer = input(f"The file '{filename}' already exists. Do you want to overwrite it? [y/n]: ")
+            if answer.lower() != 'y':
+                print("Using the existing file.")
+                return
+        response = requests.get(url)
+        response.raise_for_status()  # raises an exception if the response is not OK
+        with open(filename, 'wb') as f:
+            f.write(response.content)
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while downloading the categories page: {e}")
         print("--- DEBUG INFORMATION ---")
-        print(f"url:  url")
-        print(f"filename:  filename")
-        print(f"auto:  auto")
-        print(f"accept:  accept")
+        print(f"url:  {url}")
+        print(f"filename:  {filename}")
         print("--- DEBUG INFORMATION ---")
-        raise ValueError("getPage() has crashed.")
+        raise ValueError("get_categories_page() has crashed.")
+    except Exception as e:
+        print(f"An error occurred while checking the existence of file or overwriting it: {e}")
+        print("--- DEBUG INFORMATION ---")
+        print(f"filename: {filename}")
+        print("--- DEBUG INFORMATION ---")
+        raise ValueError("get_categories_page() has crashed.")
+
 
 
 def removeNonAlphaNumeric(string, unidecode, replaceWithDash, replaceWithUnderscore, removeSlashes):
