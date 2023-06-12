@@ -1,7 +1,0 @@
-beautifulsoup4
-lxml
-requests
-transliterate
-unidecode
-tqdm
-playwright
